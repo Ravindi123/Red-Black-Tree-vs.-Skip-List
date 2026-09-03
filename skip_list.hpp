@@ -27,8 +27,16 @@ private:
     std::mt19937 rng_;
     std::uniform_real_distribution<double> dist_;
 
+    mutable size_t cmp_count_ = 0; // mutable counter for comparisons when insert/search/delete is called
+    size_t dynamic_memory_ = 0;
+
+    bool compare(const Key& a, const Key& b) const {
+        ++cmp_count_;
+        return comp_(a, b);
+    }
+
     bool eq(const Key& a, const Key& b) const {
-        return !comp_(a, b) && !comp_(b, a);
+        return !compare(a, b) && !compare(b, a);
     }
 
     int random_level() {
@@ -63,7 +71,7 @@ public:
         std::vector<Node*> update(max_level_, head_);
         Node* cur = head_;
         for (int i = level_ - 1; i >= 0; --i) {
-            while (cur->forward[i] != nullptr && comp_(cur->forward[i]->key, key)) {
+            while (cur->forward[i] != nullptr && compare(cur->forward[i]->key, key)) {
                 cur = cur->forward[i];
             }
             update[i] = cur;
@@ -77,6 +85,7 @@ public:
             level_ = new_level;
         }
         Node* node = new Node(key, new_level);
+        dynamic_memory_ += new_level * sizeof(Node*);
         for (int i = 0; i < new_level; ++i) {
             node->forward[i] = update[i]->forward[i];
             update[i]->forward[i] = node;
@@ -90,7 +99,7 @@ public:
         std::vector<Node*> update(max_level_, head_);
         Node* cur = head_;
         for (int i = level_ - 1; i >= 0; --i) {
-            while (cur->forward[i] != nullptr && comp_(cur->forward[i]->key, key)) {
+            while (cur->forward[i] != nullptr && compare(cur->forward[i]->key, key)) {
                 cur = cur->forward[i];
             }
             update[i] = cur;
@@ -103,6 +112,7 @@ public:
             update[i]->forward[i] = target->forward[i];
         }
         delete target;
+        dynamic_memory_ -= target->forward.capacity() * sizeof(Node*);
         while (level_ > 1 && head_->forward[level_ - 1] == nullptr) --level_;
         --size_;
         return true;
@@ -111,7 +121,7 @@ public:
     bool search(const Key& key) const {
         Node* cur = head_;
         for (int i = level_ - 1; i >= 0; --i) {
-            while (cur->forward[i] != nullptr && comp_(cur->forward[i]->key, key)) {
+            while (cur->forward[i] != nullptr && compare(cur->forward[i]->key, key)) {
                 cur = cur->forward[i];
             }
         }
@@ -150,6 +160,20 @@ public:
             }
         }
         return true;
+    }
+
+    size_t get_comparisons() const {
+        return cmp_count_;
+    }
+
+    void reset_comparisons() const {
+        cmp_count_ = 0;
+    }
+
+    size_t memory_footprint() const {
+        size_t base_nodes = (size_ + 1) * sizeof(Node);
+        size_t head_vec = max_level_ * sizeof(Node*);
+        return sizeof(*this) + base_nodes + head_vec + dynamic_memory_;
     }
 };
 

@@ -13,6 +13,7 @@ template <typename Key, typename Compare = std::less<Key>>
 class RedBlackTree {
 private:
     enum class Color { RED, BLACK };
+    mutable size_t cmp_count_ = 0; // mutable counter for comparisons when insert/search/delete is called
 
     struct Node {
         Key key;
@@ -29,8 +30,13 @@ private:
     size_t size_;
     Compare comp_;
 
+    bool compare(const Key& a, const Key& b) const {
+        ++cmp_count_;
+        return comp_(a, b);
+    }
+
     bool eq(const Key& a, const Key& b) const {
-        return !comp_(a, b) && !comp_(b, a);
+        return !compare(a, b) && !compare(b, a);
     }
 
     void left_rotate(Node* x) {
@@ -166,7 +172,7 @@ private:
     Node* find_node(const Key& key) const {
         Node* x = root_;
         while (x != nil_ && !eq(x->key, key)) {
-            x = comp_(key, x->key) ? x->left : x->right;
+            x = compare(key, x->key) ? x->left : x->right;
         }
         return x;
     }
@@ -200,8 +206,8 @@ private:
         int lh = validate_node(x->left, ok);
         int rh = validate_node(x->right, ok);
         if (lh != rh) ok = false;
-        if (x->left != nil_ && comp_(x->key, x->left->key)) ok = false;
-        if (x->right != nil_ && comp_(x->right->key, x->key)) ok = false;
+        if (x->left != nil_ && compare(x->key, x->left->key)) ok = false;
+        if (x->right != nil_ && compare(x->right->key, x->key)) ok = false;
         return lh + (x->color == Color::BLACK ? 1 : 0);
     }
 
@@ -227,12 +233,12 @@ public:
         while (x != nil_) {
             y = x;
             if (eq(key, x->key)) return false;
-            x = comp_(key, x->key) ? x->left : x->right;
+            x = compare(key, x->key) ? x->left : x->right;
         }
         Node* z = new Node(key, Color::RED, nil_);
         z->parent = y;
         if (y == nil_) root_ = z;
-        else if (comp_(z->key, y->key)) y->left = z;
+        else if (compare(z->key, y->key)) y->left = z;
         else y->right = z;
         insert_fixup(z);
         ++size_;
@@ -295,8 +301,20 @@ public:
         validate_node(root_, ok);
         return ok;
     }
+    
+    size_t get_comparisons() const {
+        return cmp_count_;
+    } 
+
+    void reset_comparisons() const {
+        cmp_count_ = 0;
+    }
+
+    size_t memory_footprint() const {
+        return sizeof(*this) + (size_ + 1) * sizeof(Node);
+    }
 };
 
-} // namespace ds
+}// namespace ds
 
 #endif // RED_BLACK_TREE_HPP
