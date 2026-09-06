@@ -111,8 +111,8 @@ public:
             if (update[i]->forward[i] != target) break;
             update[i]->forward[i] = target->forward[i];
         }
-        delete target;
         dynamic_memory_ -= target->forward.capacity() * sizeof(Node*);
+        delete target;
         while (level_ > 1 && head_->forward[level_ - 1] == nullptr) --level_;
         --size_;
         return true;

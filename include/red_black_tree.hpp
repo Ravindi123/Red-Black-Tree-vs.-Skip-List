@@ -292,7 +292,6 @@ public:
         inorder_collect(root_, out);
         return out;
     }
-
     // Checks: root black, no red-red violation, equal black-height on every
     // path, and BST ordering. Used by tests and, later, benchmark sanity checks.
     bool validate() const {
