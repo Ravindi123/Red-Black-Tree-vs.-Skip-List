@@ -1,6 +1,6 @@
-#include "../skip_list.hpp"
-#include "../red_black_tree.hpp"
-#include "../dataset_generator.hpp"
+#include "../include/skip_list.hpp"
+#include "../include/red_black_tree.hpp"
+#include "../include/dataset_generator.hpp"
 #include <iostream>
 #include <cassert>
 
