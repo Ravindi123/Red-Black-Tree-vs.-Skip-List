@@ -7,7 +7,6 @@
 
 namespace ds {
 
-// Randomized alternative to balanced BSTs (Pugh, 1990).
 // Set semantics: duplicate keys are rejected on insert.
 template <typename Key, typename Compare = std::less<Key>>
 class SkipList {
@@ -145,7 +144,7 @@ public:
     }
 
     // Sanity checks: level-0 is strictly increasing, and every higher level
-    // is a strictly increasing subsequence (structural well-formedness).
+    // is a strictly increasing subsequence.
     bool validate() const {
         Node* prev = nullptr;
         for (Node* cur = head_->forward[0]; cur != nullptr; cur = cur->forward[0]) {

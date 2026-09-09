@@ -7,7 +7,6 @@
 
 namespace ds {
 
-// Deterministic self-balancing BST (Guibas & Sedgewick, 1978).
 // Set semantics: duplicate keys are rejected on insert.
 template <typename Key, typename Compare = std::less<Key>>
 class RedBlackTree {
