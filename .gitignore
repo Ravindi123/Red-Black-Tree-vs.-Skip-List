@@ -2,3 +2,4 @@ CS4523_Project_Proposal.pdf
 *.o
 *.exe
 .venv/*
+benchmarking/benchmark_results.csv
