@@ -1,6 +1,6 @@
-#include "../include/skip_list.hpp"
+#include "../include/skip_list_optimized.hpp"
 #include "../include/red_black_tree.hpp"
-#include "../include/dataset_generator.hpp"
+#include "../include/dataset_generators.hpp"
 #include <iostream>
 #include <fstream>
 #include <chrono>
@@ -13,7 +13,6 @@
 using namespace ds;
 using namespace std::chrono;
 
-// Pass the open file stream instead of a vector
 template <typename Structure, typename Key>
 void run_workload(const std::string& struct_name, const std::string& dataset_name, 
                   const std::vector<Key>& keys, int run, std::ofstream& file) {
@@ -79,10 +78,10 @@ void run_workload(const std::string& struct_name, const std::string& dataset_nam
 }
 
 int main() {
-    std::vector<size_t> N_values = {1000, 10000, 100000}; 
-    int num_runs = 3; 
+    std::vector<size_t> N_values = {1000, 10000, 100000, 1000000}; 
+    int num_runs = 5; 
     
-    std::string filename = "benchmark_results.csv";
+    std::string filename = "results/benchmark_results_optimized.csv";
     std::ofstream file(filename);
     
     if (!file.is_open()) {
@@ -90,10 +89,9 @@ int main() {
         return 1;
     }
 
-    // Real-world keys: dictionary words used directly as string keys.
     std::vector<std::string> real_keys;
     try {
-        real_keys = bench::DatasetGenerator::load_words_from_file("datasets/google-10000-english-usa.txt");
+        real_keys = bench::load_real_world("datasets/google-10000-english-usa.txt");
     } catch (const std::exception& e) {
         std::cerr << "Warning: could not load real dataset: " << e.what() << "\n";
     }
@@ -104,24 +102,27 @@ int main() {
 
     for (size_t n : N_values) {
         std::cout << "Testing N = " << n << "\n";
+
+        auto uniform = bench::generate_uniform(n, 42);
+        auto sorted = bench::generate_sorted(n);
+        auto skewed = bench::generate_skewed(n, 42);
+
         for (int run = 1; run <= num_runs; ++run) {
-            auto uniform = bench::DatasetGenerator::generate_uniform(n, 0, n * 10, run);
-            auto sorted = bench::DatasetGenerator::generate_sorted(n);
-            auto skewed = bench::DatasetGenerator::generate_skewed(n, 0.1, run);
             
-            run_workload<RedBlackTree<int>>("RedBlackTree", "Uniform", uniform, run, file);
-            run_workload<SkipList<int>>("SkipList", "Uniform", uniform, run, file);
+            run_workload<RedBlackTree<bench::Key>>("RedBlackTree", "Uniform", uniform, run, file);
+            run_workload<SkipList<bench::Key>>("SkipList", "Uniform", uniform, run, file);
 
-            run_workload<RedBlackTree<int>>("RedBlackTree", "Sorted", sorted, run, file);
-            run_workload<SkipList<int>>("SkipList", "Sorted", sorted, run, file);
+            run_workload<RedBlackTree<bench::Key>>("RedBlackTree", "Sorted", sorted, run, file);
+            run_workload<SkipList<bench::Key>>("SkipList", "Sorted", sorted, run, file);
 
-            run_workload<RedBlackTree<int>>("RedBlackTree", "Skewed", skewed, run, file);
-            run_workload<SkipList<int>>("SkipList", "Skewed", skewed, run, file);
+            run_workload<RedBlackTree<bench::Key>>("RedBlackTree", "Skewed", skewed, run, file);
+            run_workload<SkipList<bench::Key>>("SkipList", "Skewed", skewed, run, file);
 
             if (n <= real_keys.size()) {
                 std::vector<std::string> real_subset(real_keys.begin(), real_keys.begin() + n);
                 run_workload<RedBlackTree<std::string>>("RedBlackTree", "Real", real_subset, run, file);
                 run_workload<SkipList<std::string>>("SkipList", "Real", real_subset, run, file);
+
             } else {
                 std::cout << "  Skipping Real dataset for N=" << n << " (only " << real_keys.size() << " words available)\n";
             }

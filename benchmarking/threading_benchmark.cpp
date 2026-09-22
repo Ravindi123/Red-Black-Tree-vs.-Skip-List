@@ -1,6 +1,6 @@
 #include "../include/red_black_tree.hpp"
 #include "../include/concurrent_skip_list.hpp"
-#include "../include/dataset_generator.hpp"
+#include "../include/dataset_generators.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -11,13 +11,14 @@
 #include <vector>
 
 using namespace ds;
+using namespace bench;
 using namespace std::chrono;
 
 namespace {
 
 struct Args {
     std::vector<int> thread_counts = {1, 2, 4, 8, 16};
-    std::int64_t total_keys = 1000000;
+    std::vector<std::int64_t> total_keys_list = {1000, 10000, 100000, 1000000};
     int repeats = 5;
     std::string output = "results/threading_results.csv";
 };
@@ -30,6 +31,14 @@ std::vector<int> split_ints(const std::string& s) {
     return out;
 }
 
+std::vector<std::int64_t> split_int64s(const std::string& s) {
+    std::vector<std::int64_t> out;
+    std::stringstream ss(s);
+    std::string item;
+    while (std::getline(ss, item, ',')) out.push_back(std::stoll(item));
+    return out;
+}
+
 Args parse_args(int argc, char** argv) {
     Args a;
     for (int i = 1; i < argc; ++i) {
@@ -39,7 +48,7 @@ Args parse_args(int argc, char** argv) {
             return argv[++i];
         };
         if (arg == "--threads") a.thread_counts = split_ints(next());
-        else if (arg == "--total-keys") a.total_keys = std::stoll(next());
+        else if (arg == "--total-keys") a.total_keys_list = split_int64s(next());
         else if (arg == "--repeats") a.repeats = std::stoi(next());
         else if (arg == "--output") a.output = next();
         else throw std::runtime_error("unknown argument: " + arg);
@@ -74,7 +83,7 @@ std::vector<std::pair<size_t, size_t>> partition_ranges(size_t total, int num_pa
 }
 
 template <typename Structure>
-double run_one_trial(const std::vector<int>& keys, int num_threads, Structure& structure) {
+double run_one_trial(const std::vector<Key>& keys, int num_threads, Structure& structure) {
     auto ranges = partition_ranges(keys.size(), num_threads);
     std::vector<std::thread> threads;
     threads.reserve(static_cast<size_t>(num_threads));
@@ -92,7 +101,7 @@ double run_one_trial(const std::vector<int>& keys, int num_threads, Structure& s
 }
 
 template <typename Structure>
-double run_single_threaded_trial(const std::vector<int>& keys, Structure& structure) {
+double run_single_threaded_trial(const std::vector<Key>& keys, Structure& structure) {
     auto t0 = std::chrono::steady_clock::now();
     for (int key : keys) structure.insert(key);
     auto t1 = std::chrono::steady_clock::now();
@@ -122,38 +131,43 @@ int main(int argc, char** argv) {
     out << "structure,threads,repeat,total_keys,elapsed_ms,throughput_ops_per_sec,"
            "final_size,structure_valid\n";
 
-    int sl_max_level = skip_list_max_level(args.total_keys);
-    for (int threads : args.thread_counts) {
-        for (int rep = 0; rep < args.repeats; ++rep) {
-            unsigned seed = static_cast<unsigned>(threads * 1000003u + rep * 97u);
-            auto keys = bench::DatasetGenerator::generate_uniform(args.total_keys, seed);
+    for (std::int64_t total_keys : args.total_keys_list) {
+        int sl_max_level = skip_list_max_level(total_keys);
+        for (int threads : args.thread_counts) {
+            unsigned seed = static_cast<unsigned>(threads * 1000003u);
 
-            {
-                RedBlackTree<int> rbt;
-                double ms = run_single_threaded_trial(keys, rbt);
-                double throughput = static_cast<double>(args.total_keys) / (ms / 1000.0);
-                bool valid = (rep == 0) ? rbt.validate() : true; 
-                // threads column records the concurrency level under test for this row's
-                // skip list counterpart; RBT itself always runs single-threaded here.
-                out << "RBT_SingleThreaded," << threads << "," << rep << "," << args.total_keys << ","
-                    << ms << "," << throughput << "," << rbt.size() << "," << (valid ? 1 : 0) << "\n";
-            }
-            {
-                ConcurrentSkipList<int> sl(0.5, sl_max_level, seed + 555);
-                double ms = run_one_trial(keys, threads, sl);
-                double throughput = static_cast<double>(args.total_keys) / (ms / 1000.0);
-                bool valid = true;
-                if (rep == 0) {
-                    auto sorted = sl.to_sorted_vector();
-                    valid = std::is_sorted(sorted.begin(), sorted.end()) &&
-                            sorted.size() == sl.size();
+            auto keys = bench::generate_uniform(total_keys, seed);
+
+            for (int rep = 0; rep < args.repeats; ++rep) {
+                unsigned seed = static_cast<unsigned>(threads * 1000003u + rep * 97u);
+
+                {
+                    RedBlackTree<bench::Key> rbt;
+                    double ms = run_single_threaded_trial(keys, rbt);
+                    double throughput = static_cast<double>(total_keys) / (ms / 1000.0);
+                    bool valid = (rep == 0) ? rbt.validate() : true;
+                    // threads column records the concurrency level under test for this row's
+                    // skip list counterpart; RBT itself always runs single-threaded here.
+                    out << "RBT_SingleThreaded," << threads << "," << rep << "," << total_keys << ","
+                        << ms << "," << throughput << "," << rbt.size() << "," << (valid ? 1 : 0) << "\n";
                 }
-                out << "SkipList_FineGrained," << threads << "," << rep << "," << args.total_keys << ","
-                    << ms << "," << throughput << "," << sl.size() << "," << (valid ? 1 : 0) << "\n";
+                {
+                    ConcurrentSkipList<bench::Key> sl(0.5, sl_max_level, seed + 555);
+                    double ms = run_one_trial(keys, threads, sl);
+                    double throughput = static_cast<double>(total_keys) / (ms / 1000.0);
+                    bool valid = true;
+                    if (rep == 0) {
+                        auto sorted = sl.to_sorted_vector();
+                        valid = std::is_sorted(sorted.begin(), sorted.end()) &&
+                                sorted.size() == sl.size();
+                    }
+                    out << "SkipList_FineGrained," << threads << "," << rep << "," << total_keys << ","
+                        << ms << "," << throughput << "," << sl.size() << "," << (valid ? 1 : 0) << "\n";
+                }
+                out.flush();
             }
-            out.flush();
+            std::cerr << "finished threads=" << threads << " total_keys=" << total_keys << "\n";
         }
-        std::cerr << "finished threads=" << threads << "\n";
     }
 
     std::cerr << "Done. Wrote " << args.output << "\n";
