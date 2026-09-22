@@ -49,7 +49,7 @@ void test_data_generators() {
     assert(skewed.size() == 100);
 
     try {
-        std::string filepath = "../Datasets/google-10000-english-usa.txt"; // Adjust path as necessary
+        std::string filepath = "datasets/google-10000-english-usa.txt"; 
         auto words = bench::DatasetGenerator::load_words_from_file(filepath);
         assert(!words.empty());
         std::cout << "Successfully loaded " << words.size() << " words from file.\n";
