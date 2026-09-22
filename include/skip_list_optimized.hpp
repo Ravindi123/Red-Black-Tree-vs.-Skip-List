@@ -231,7 +231,7 @@ public:
     }
 
     size_t memory_footprint() const {
-        size_t base_nodes = (size_ + 1) * sizeof(Node); 
+        size_t base_nodes = (size_ + 1) * header_bytes(); 
         size_t head_vec = max_level_ * sizeof(Node*);
         return sizeof(*this) + base_nodes + head_vec + dynamic_memory_;
     }
